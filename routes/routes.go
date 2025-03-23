@@ -13,4 +13,5 @@ func SetupRoutes(router *gin.Engine) {
 	})
 
 	router.POST("/url", controllers.CreateShortUrl)
+	router.GET("/:short_url", controllers.GetOriginalUrl)
 }

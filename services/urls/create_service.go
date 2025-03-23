@@ -2,43 +2,50 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
-	"time"
+	"math/big"
 
 	"github.com/rodrigosuco/go-url-shortener/internal/database"
 	"github.com/rodrigosuco/go-url-shortener/models"
 )
 
-func CreateUrl(url models.Url) (models.Url, error)  {
+const shortUrlLength = 5
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-	url.ShortUrl = randomString(5)
+func CreateUrl(url models.Url) (models.Url, error) {
+	var err error
+	for {
+		url.ShortUrl = randomString(shortUrlLength)
+		exists, _ := FindOriginalURl(url.ShortUrl)
+		if exists == nil {
+			break
+		}
+	}
 
-	url, err := saveUrl(url)
-
+	url, err = saveUrl(url)
 	if err != nil {
-		return url, err
+		return models.Url{}, err
 	}
 
 	return url, nil
-
 }
 
 func saveUrl(url models.Url) (models.Url, error) {
 	query := `INSERT INTO urls (original_url, short_url)
-						VALUES ($1, $2)
-						RETURNING id, original_url, short_url, created_at;`
+	          VALUES ($1, $2)
+	          RETURNING id, original_url, short_url, created_at`
 
 	err := database.DB.QueryRow(
-	context.Background(),
-	query,
-	url.OriginalUrl,
-	url.ShortUrl,
+		context.Background(),
+		query,
+		url.OriginalUrl,
+		url.ShortUrl,
 	).Scan(
-	&url.ID,
-	&url.OriginalUrl,
-	&url.ShortUrl,
-	&url.CreatedAt,
+		&url.ID,
+		&url.OriginalUrl,
+		&url.ShortUrl,
+		&url.CreatedAt,
 	)
 
 	if err != nil {
@@ -48,8 +55,10 @@ func saveUrl(url models.Url) (models.Url, error) {
 }
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	b := make([]byte, length+2)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)[2 : length+2]
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		result[i] = charset[num.Int64()]
+	}
+	return string(result)
 }
